@@ -3,9 +3,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Copy package files and install all dependencies
 COPY package.json package-lock.json* ./
 RUN npm install && npm cache clean --force
 
+# Copy the full app and build
 COPY . .
 RUN npm run build
 
@@ -20,7 +22,7 @@ RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
     /opt/venv/bin/pip install --timeout=1000 --no-cache-dir -r requirements.txt
 
-# System dependencies for opencv-python-headless and mediapipe
+# System dependencies for OpenCV and MediaPipe
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -28,7 +30,6 @@ RUN apt-get update && \
         curl \
         libgl1 \
         libglib2.0-0 \
-        libglib2.0-bin \
         libgstreamer1.0-0 \
         supervisor \
         build-essential \
@@ -38,18 +39,18 @@ RUN apt-get update && \
         npm && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Node.js build artifacts
+# Copy Node.js build artifacts and config
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/client ./client
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json* ./package-lock.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/vite.config.ts ./vite.config.ts
 COPY --from=builder /app/vite.config.server.ts ./vite.config.server.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Install Node.js production deps
+# Install only production Node.js dependencies
 RUN npm ci --only=production && npm cache clean --force
 
 # Add non-root user
